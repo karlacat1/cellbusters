@@ -15,8 +15,8 @@ library(Seurat)
 Read in the single cell data.
 
 ```{r}
-sn_exon   = read.csv('../data/GSE123454_cells_exon_counts.csv.gz')
-sn_intron = read.csv('../data/GSE123454_cells_intron_counts.csv.gz')
+sc_exon   = read.csv('../data/GSE123454_cells_exon_counts.csv.gz')
+sc_intron = read.csv('../data/GSE123454_cells_intron_counts.csv.gz')
 ```
 
 Read in the single nuclear data.
