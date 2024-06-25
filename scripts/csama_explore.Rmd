@@ -1,0 +1,22 @@
+---
+title: "scRNASeq / snSeqRNA"
+author: "DMG"
+date: "2024-06-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(Seurat)
+```
+
+Read in the data.
+
+```{r}
+sn_exon   = read.csv('../data/GSE123454_nuclei_exon_counts.csv.gz')
+sn_intron = read.csv('../data/GSE123454_nuclei_intron_counts.csv.gz')
+```
+
+
