@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(ggbeeswarm)
 library(Seurat)
 library(Matrix)
 library(sctransform)
@@ -127,15 +128,16 @@ df %>%
   ggplot(aes(value)) +
     geom_histogram(bins = 100) +
     facet_wrap(~name, ncol = 1, scales = 'free_y') + 
-    labs(title = 'Intronic Proportions in Each Cell')
+    labs(title = 'Intronic Proportions in Each Cell') +
+    theme(text = element_text(size = 20))
 ```
+
+Get the proportion of intronic reads overall in single cell & single nuclear.
 
 ```{r}
-tibble(x = merged.obj$orig.ident, 
-       y = merged.obj$percent.ribo) %>%
-  ggplot(aes(x, y, fill=x))
+sum(cell_intron) / sum(cell_intron + cell_exon)
+sum(nuc_intron)  / sum(nuc_intron  + nuc_exon)
 ```
-
 
 ```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nFeature_RNA),aes(x, y, fill=x)) +
@@ -171,9 +173,75 @@ ggplot(tibble(x = merged.obj$orig.ident, y = merged.obj$percent.ribo), aes(x, y,
 
 Normalize, scale data, run PCA, and clustering.
 
+```{r}
+obj_cell = obj_cell %>%
+             NormalizeData(, normalization.method = 'LogNormalize') %>%
+             FindVariableFeatures(nfeatures = 2000) %>%
+             ScaleData(vars.to.regress = 'nFeature_RNA') %>%
+             RunPCA(npcs = 100)
+```
+
 
 ```{r}
+ElbowPlot(obj_cell, ndims = 100) +
+    theme(text = element_text(size = 20))
+```
 
+Select 25 PCs.
+
+```{r}
+num_pcs = 25
+```
+
+```{r}
+obj_cell = obj_cell %>%
+             FindNeighbors(obj_cell, reduction = 'pca', 
+                           dims = 1:num_pcs) %>%
+             FindClusters(resolution = seq(0.1, 1.0, 0.1)) %>%
+             RunUMAP(reduction = 'pca', dims = 1:num_pcs)
+```
+
+Plot UMAP.
+
+```{r}
+UMAPPlot(obj_cell, label = TRUE, label.size = 6) +
+    theme(text = element_text(size = 20))
+```
+
+Correlate PCA with clusters.
+
+```{r}
+cols = colnames(obj_cell[[]])[grep('^RNA_snn', colnames(obj_cell[[]]))]
+
+pcs = Reductions(obj_cell, slot = 'pca')@cell.embeddings
+
+output = expand.grid(cols, colnames(pcs)[1:10])
+colnames(output) = c('Resolution', 'n_PCs')
+output$rsq = 0
+output$Resolution = sub('RNA_snn_res.', '', output$Resolution)
+
+for(i in 1:10) {
+  
+  for(j in seq_along(cols)) {
+    
+    x   = data.frame(x = factor(obj_cell[[]][,cols[j]]))
+    x   = model.matrix(~x, data = x)[,-1]
+    mod = lm(pcs[,i] ~ x)
+    output$rsq[(i - 1) * 10 + j] = summary(mod)$r.squared
+
+  } # for(j)
+  
+} # for(i)
+```
+
+```{r}
+output %>%
+  ggplot(aes(Resolution, rsq)) +
+    geom_line(aes(color = n_PCs, group = n_PCs)) +
+    labs(title = "R^2 versus cluster resolution",
+         y     = "R^2", 
+         color = "Num PCs") +
+    theme(text = element_text(size = 20))
 ```
 
 
