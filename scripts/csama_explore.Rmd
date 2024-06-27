@@ -1,6 +1,6 @@
 ---
 title: "scRNASeq / snSeqRNA"
-author: "DMG"
+author: "cellbusters"
 date: "2024-06-25"
 output: html_document
 ---
@@ -15,17 +15,61 @@ library(Seurat)
 Read in the single cell data.
 
 ```{r}
-sc_exon   = read.csv('../data/GSE123454_cells_exon_counts.csv.gz')
-sc_intron = read.csv('../data/GSE123454_cells_intron_counts.csv.gz')
+sc_exon   = read.csv('../data/GSE123454_cells_exon_counts.csv.gz') %>%
+              column_to_rownames('X') %>%
+              as.matrix()
+sc_intron = read.csv('../data/GSE123454_cells_intron_counts.csv.gz') %>%
+              column_to_rownames('X') %>%
+              as.matrix()
 ```
 
 Read in the single nuclear data.
 
 ```{r}
-sn_exon   = read.csv('../data/GSE123454_nuclei_exon_counts.csv.gz')
-sn_intron = read.csv('../data/GSE123454_nuclei_intron_counts.csv.gz')
+sn_exon   = read.csv('../data/GSE123454_nuclei_exon_counts.csv.gz') %>%
+              column_to_rownames('X') %>%
+              as.matrix()
+sn_intron = read.csv('../data/GSE123454_nuclei_intron_counts.csv.gz') %>%
+              column_to_rownames('X') %>%
+              as.matrix()
 ```
 
+What is the distribution of intron and exon counts in each data set?
 
+```{r}
+df = data.frame(gene_id   = rownames(sc_exon),
+                sc_exon   = rowSums(sc_exon,   na.rm = TRUE),
+                sc_intron = rowSums(sc_intron, na.rm = TRUE),
+                sn_exon   = rowSums(sn_exon,   na.rm = TRUE),
+                sn_intron = rowSums(sn_intron, na.rm = TRUE))
+```
+
+```{r}
+df %>%
+  pivot_longer(cols = sc_exon:sn_intron) %>%
+  separate(name, into = c('Assay', 'Exon/Intron')) %>%
+  mutate(value = value + 1) %>%
+  ggplot(aes(value)) +
+    geom_histogram(bins = 100) +
+    scale_x_log10() +
+    facet_grid(Assay ~ `Exon/Intron`) +
+    lims(y = c(0, 1000)) +
+    labs(title = 'Distribution of Exon and Intron Reads')
+```
+
+Plot the proportion of intron reads for each gene in sc & sn.
+
+```{r}
+df = data.frame(sc_prop = rowMeans(sc_intron / (sc_intron + sc_exon)),
+                sn_prop = rowMeans(sn_intron / (sn_intron + sn_exon)))
+
+df %>%
+  filter(!is.nan(sc_prop) & ! is.nan(sn_prop)) %>%
+  pivot_longer(cols = sc_prop:sn_prop) %>%
+  mutate(name = if_else(name == 'sc_prop', 'SC', 'SN')) %>%
+  ggplot(aes(value)) +
+    geom_histogram(bins = 100) +
+    facet_wrap(~name, ncol = 1)
+```
 
 
