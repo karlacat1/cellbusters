@@ -10,44 +10,73 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(Seurat)
+library(Matrix)
 library(sctransform)
 ```
 
 Read in the single cell data.
 
 ```{r}
-sc_exon   = read.csv('../data/GSE123454_cells_exon_counts.csv.gz') %>%
-              column_to_rownames('X') %>%
-              as.matrix()
-sc_intron = read.csv('../data/GSE123454_cells_intron_counts.csv.gz') %>%
-              column_to_rownames('X') %>%
-              as.matrix()
+path2matrix <- function(path_csv_gz, data_name) {
+  input_df           = read.csv(path_csv_gz)
+  rownames(input_df) = input_df$X
+  input_df           = input_df[, -1]
+  input_matrix       = as.sparse(input_df)
+  input_matrix
+  # obj = CreateSeuratObject(counts=input_matrix, project=data_name)
+}
 ```
 
-Read in the single nuclear data.
 
 ```{r}
-sn_exon   = read.csv('../data/GSE123454_nuclei_exon_counts.csv.gz') %>%
-              column_to_rownames('X') %>%
-              as.matrix()
-sn_intron = read.csv('../data/GSE123454_nuclei_intron_counts.csv.gz') %>%
-              column_to_rownames('X') %>%
-              as.matrix()
+cell_exon   = path2matrix('../data/GSE123454_cells_exon_counts.csv.gz',   "cell_exon")
+cell_intron = path2matrix('../data/GSE123454_cells_intron_counts.csv.gz', "cell_intron")
+
+nuc_exon   = path2matrix('../data/GSE123454_nuclei_exon_counts.csv.gz',   "nuc_exon")
+nuc_intron = path2matrix('../data/GSE123454_nuclei_intron_counts.csv.gz', "nuc_exon")
+```
+
+Verify that the gene IDs are in the same order in both data sets.
+
+```{r}
+stopifnot(rownames(cell_exon) == rownames(cell_intron))
+stopifnot(rownames(cell_exon) == rownames(nuc_exon))
+stopifnot(rownames(cell_exon) == rownames(nuc_intron))
+```
+
+Combining data & create Seurat objects.
+
+```{r}
+data_nuc  = nuc_exon  + nuc_intron
+data_cell = cell_exon + cell_intron
+
+obj_nuc  = CreateSeuratObject(counts = data_nuc,  project = "data_nuc")
+obj_cell = CreateSeuratObject(counts = data_cell, project = "data_cell")
+```
+
+```{r}
+# Merge samples
+merged.obj <- merge(obj_nuc, y = c(obj_cell),
+              add.cell.ids = c("nuclei", "cells"), project = "cellbusters")
+
+merged.obj$orig.ident <- sapply(X = strsplit(colnames(merged.obj), split = "_"), 
+                                FUN = "[", 1)
+merged.obj[["percent.mt"]] <- PercentageFeatureSet(merged.obj, pattern = "^[Mm][Tt]-")
 ```
 
 What is the distribution of intron and exon counts in each data set?
 
 ```{r}
-df = data.frame(gene_id   = rownames(sc_exon),
-                sc_exon   = rowSums(sc_exon,   na.rm = TRUE),
-                sc_intron = rowSums(sc_intron, na.rm = TRUE),
-                sn_exon   = rowSums(sn_exon,   na.rm = TRUE),
-                sn_intron = rowSums(sn_intron, na.rm = TRUE))
+df = data.frame(gene_id     = rownames(cell_exon),
+                cell_exon   = rowSums(cell_exon,   na.rm = TRUE),
+                cell_intron = rowSums(cell_intron, na.rm = TRUE),
+                nuc_exon    = rowSums(nuc_exon,    na.rm = TRUE),
+                nuc_intron  = rowSums(nuc_intron,  na.rm = TRUE))
 ```
 
 ```{r}
 df %>%
-  pivot_longer(cols = sc_exon:sn_intron) %>%
+  pivot_longer(cols = cell_exon:nuc_intron) %>%
   separate(name, into = c('Assay', 'Exon/Intron')) %>%
   mutate(value = value + 1) %>%
   ggplot(aes(value)) +
@@ -61,35 +90,74 @@ df %>%
 Plot the proportion of intron reads for each gene in sc & sn.
 
 ```{r}
-df = data.frame(sc_prop = rowMeans(sc_intron / (sc_intron + sc_exon)),
-                sn_prop = rowMeans(sn_intron / (sn_intron + sn_exon)))
+df = data.frame(sc_prop = rowSums(cell_intron) / rowSums(cell_intron + cell_exon),
+                sn_prop = rowSums(nuc_intron)  / rowSums(nuc_intron  + nuc_exon))
 
 df %>%
   filter(!is.nan(sc_prop) & ! is.nan(sn_prop)) %>%
   pivot_longer(cols = sc_prop:sn_prop) %>%
-  mutate(name = if_else(name == 'sc_prop', 'SC', 'SN')) %>%
+  mutate(name = if_else(name == 'sc_prop', 'Single Cell', 'Single Nuclear')) %>%
   ggplot(aes(value)) +
     geom_histogram(bins = 100) +
-    facet_wrap(~name, ncol = 1)
+    facet_wrap(~name, ncol = 1, scales = 'free_y') + 
+    labs(title = 'Intronic Proportions in Each Gene')
+```
+
+Plot the proportion of intron reads for each cell in sc & sn.
+
+```{r}
+df = data.frame(sc_prop = colSums(cell_intron) / colSums(cell_intron + cell_exon),
+                sn_prop = colSums(nuc_intron)  / colSums(nuc_intron + nuc_exon))
+
+df %>%
+  filter(!is.nan(sc_prop) & ! is.nan(sn_prop)) %>%
+  pivot_longer(cols = sc_prop:sn_prop) %>%
+  mutate(name = if_else(name == 'sc_prop', 'Single Cell', 'Single Nuclear')) %>%
+  ggplot(aes(value)) +
+    geom_histogram(bins = 100) +
+    facet_wrap(~name, ncol = 1, scales = 'free_y') + 
+    labs(title = 'Intronic Proportions in Each Cell')
+```
+
+```{r}
+ribo_genes = rownames(cell_exon)[grep('^Rp[sl]', rownames(cell_exon))]
+ribo_genes = ribo_genes[!grepl('ps[0-9]+$', ribo_genes)]
+
+merged.obj[["percent.ribo"]] <- PercentageFeatureSet(merged.obj, features = ribo_genes)
+```
+
+```{r}
+tibble(x = merged.obj$orig.ident, 
+       y = merged.obj$percent.ribo) %>%
+  ggplot(aes(x, y, fill=x))
 ```
 
 
 ```{r}
-path2obj <- function(path_csv_gz, data_name){
-  input_df = read.csv(path_csv_gz)
-  rownames(input_df) = input_df$X
-  input_df = input_df[, -1]
-  input_matrix = as.matrix(input_df)
-  obj = CreateSeuratObject(counts=input_matrix, project=data_name)
-}
+ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nFeature_RNA),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  theme_classic() +
+  guides(fill=F) +
+  ylab("nFeatures_RNA") +
+  xlab("Samples")
+
+ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nCount_RNA),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  theme_classic() +
+  guides(fill=F) +
+  ylab("nCount_RNA") +
+  xlab("Samples") 
+
+ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$percent.mt),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  theme_classic() +
+  guides(fill=F) +
+  ylab("percent.mt") +
+  xlab("Samples")
 ```
 
-
-```{r}
-cell_exon   = path2obj('data/GSE123454_cells_exon_counts.csv.gz',   "cell_exon")
-cell_intron = path2obj('data/GSE123454_cells_intron_counts.csv.gz', "cell_intron")
-
-nuc_exon   = path2obj('data/GSE123454_nuclei_exon_counts.csv.gz',   "nuc_exon")
-nuc_intron = path2obj('data/GSE123454_nuclei_intron_counts.csv.gz', "nuc_exon")
+```{r, fig.width=10, fig.height=5}
+ident_table <- table(merged.obj$orig.ident)
+text(x = barplot(ident_table, cex.axis = 1, cex.names = 0.6), y = ident_table, labels = ident_table, pos = 1, cex = 1) 
 ```
 
