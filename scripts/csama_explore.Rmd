@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(Seurat)
+library(sctransform)
 ```
 
 Read in the single cell data.
@@ -72,4 +73,23 @@ df %>%
     facet_wrap(~name, ncol = 1)
 ```
 
+
+```{r}
+path2obj <- function(path_csv_gz, data_name){
+  input_df = read.csv(path_csv_gz)
+  rownames(input_df) = input_df$X
+  input_df = input_df[, -1]
+  input_matrix = as.matrix(input_df)
+  obj = CreateSeuratObject(counts=input_matrix, project=data_name)
+}
+```
+
+
+```{r}
+cell_exon   = path2obj('data/GSE123454_cells_exon_counts.csv.gz',   "cell_exon")
+cell_intron = path2obj('data/GSE123454_cells_intron_counts.csv.gz', "cell_intron")
+
+nuc_exon   = path2obj('data/GSE123454_nuclei_exon_counts.csv.gz',   "nuc_exon")
+nuc_intron = path2obj('data/GSE123454_nuclei_intron_counts.csv.gz', "nuc_exon")
+```
 
