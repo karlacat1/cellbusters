@@ -54,6 +54,8 @@ obj_nuc  = CreateSeuratObject(counts = data_nuc,  project = "data_nuc")
 obj_cell = CreateSeuratObject(counts = data_cell, project = "data_cell")
 ```
 
+Create a merged Seurat object.
+
 ```{r}
 # Merge samples
 merged.obj <- merge(obj_nuc, y = c(obj_cell),
@@ -61,7 +63,16 @@ merged.obj <- merge(obj_nuc, y = c(obj_cell),
 
 merged.obj$orig.ident <- sapply(X = strsplit(colnames(merged.obj), split = "_"), 
                                 FUN = "[", 1)
+```
+
+Add mitochoncrial and ribosomal gene content.
+
+```{r}
 merged.obj[["percent.mt"]] <- PercentageFeatureSet(merged.obj, pattern = "^[Mm][Tt]-")
+
+ribo_genes = rownames(cell_exon)[grep('^Rp[sl]', rownames(cell_exon))]
+ribo_genes = ribo_genes[!grepl('ps[0-9]+$', ribo_genes)]
+merged.obj[["percent.ribo"]] <- PercentageFeatureSet(merged.obj, features = ribo_genes)
 ```
 
 What is the distribution of intron and exon counts in each data set?
@@ -120,13 +131,6 @@ df %>%
 ```
 
 ```{r}
-ribo_genes = rownames(cell_exon)[grep('^Rp[sl]', rownames(cell_exon))]
-ribo_genes = ribo_genes[!grepl('ps[0-9]+$', ribo_genes)]
-
-merged.obj[["percent.ribo"]] <- PercentageFeatureSet(merged.obj, features = ribo_genes)
-```
-
-```{r}
 tibble(x = merged.obj$orig.ident, 
        y = merged.obj$percent.ribo) %>%
   ggplot(aes(x, y, fill=x))
@@ -136,28 +140,40 @@ tibble(x = merged.obj$orig.ident,
 ```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nFeature_RNA),aes(x, y, fill=x)) +
   geom_boxplot() +
-  theme_classic() +
   guides(fill=F) +
-  ylab("nFeatures_RNA") +
-  xlab("Samples")
+labs(title = "Genes per Cell", x = "Method", y = "nFeatures_RNA") +
+  theme(text = element_text(size = 20))
+```
 
+```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nCount_RNA),aes(x, y, fill=x)) +
   geom_boxplot() +
-  theme_classic() +
   guides(fill=F) +
-  ylab("nCount_RNA") +
-  xlab("Samples") 
+  labs(title = "Counts per Cell", x = "Method", y = "nCount_RNA") +
+  theme(text = element_text(size = 20))
+```
 
+```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$percent.mt),aes(x, y, fill=x)) +
   geom_boxplot() +
-  theme_classic() +
   guides(fill=F) +
-  ylab("percent.mt") +
-  xlab("Samples")
+  labs(title = "Mitochondrial RNA Content", x = "Method", y = "% Mitochondrial RNA") +
+  theme(text = element_text(size = 20))
 ```
 
-```{r, fig.width=10, fig.height=5}
-ident_table <- table(merged.obj$orig.ident)
-text(x = barplot(ident_table, cex.axis = 1, cex.names = 0.6), y = ident_table, labels = ident_table, pos = 1, cex = 1) 
+```{r}
+ggplot(tibble(x = merged.obj$orig.ident, y = merged.obj$percent.ribo), aes(x, y, fill = x)) +
+  geom_boxplot() +
+  guides(fill = F) +
+  labs(title = "Ribosomal RNA Content", x = "Method", y = "% Ribosomal RNA") +
+  theme(text = element_text(size = 20))
 ```
+
+Normalize, scale data, run PCA, and clustering.
+
+
+```{r}
+
+```
+
 
