@@ -195,7 +195,7 @@ num_pcs = 25
 
 ```{r}
 obj_cell = obj_cell %>%
-             FindNeighbors(obj_cell, reduction = 'pca', 
+             FindNeighbors(reduction = 'pca', 
                            dims = 1:num_pcs) %>%
              FindClusters(resolution = seq(0.1, 1.0, 0.1)) %>%
              RunUMAP(reduction = 'pca', dims = 1:num_pcs)
@@ -205,10 +205,11 @@ Plot UMAP.
 
 ```{r}
 UMAPPlot(obj_cell, label = TRUE, label.size = 6) +
+    labs(title = '25 PCs') +
     theme(text = element_text(size = 20))
 ```
 
-Correlate PCA with clusters.
+Correlate PCA with clusters. 25 PCs
 
 ```{r}
 cols = colnames(obj_cell[[]])[grep('^RNA_snn', colnames(obj_cell[[]]))]
@@ -238,10 +239,93 @@ for(i in 1:10) {
 output %>%
   ggplot(aes(Resolution, rsq)) +
     geom_line(aes(color = n_PCs, group = n_PCs)) +
-    labs(title = "R^2 versus cluster resolution",
+    labs(title = "R^2 versus cluster resolution: 10 PCs",
          y     = "R^2", 
          color = "Num PCs") +
     theme(text = element_text(size = 20))
 ```
 
+```{r fig.width=10,fig.height=10}
+layout(matrix(1:64, ncol = 8))
+par(plt = c(0.05, 0.95, 0.05, 0.95))
+for(i in 1:8) {
+  for(j in 1:8) {
+    if(i ==j) {
+      plot(1, 1, col = 'white')
+      text(1, 1, labels = paste0('PC', i), cex = 2)
+    } else{
+      plot(pcs[,i], pcs[,j], pch = 16, col = rgb(0,0,0,0.3))
+    }
+  } # for(j)
+  
+} # for(i)
+```
 
+Try again with 50 PCs.
+
+```{r}
+num_pcs = 50
+obj_cell_50 = obj_cell %>%
+             FindNeighbors(reduction = 'pca', 
+                           dims = 1:num_pcs) %>%
+             FindClusters(resolution = seq(0.1, 1.0, 0.1)) %>%
+             RunUMAP(reduction = 'pca', dims = 1:num_pcs)
+```
+
+Plot UMAP.
+
+```{r}
+UMAPPlot(obj_cell, label = TRUE, label.size = 6) +
+    labs(title = '50 PCs') +
+    theme(text = element_text(size = 20))
+```
+
+```{r}
+cols = colnames(obj_cell_50[[]])[grep('^RNA_snn', colnames(obj_cell_50[[]]))]
+
+pcs = Reductions(obj_cell_50, slot = 'pca')@cell.embeddings
+
+output = expand.grid(cols, colnames(pcs)[1:10])
+colnames(output) = c('Resolution', 'n_PCs')
+output$rsq = 0
+output$Resolution = sub('RNA_snn_res.', '', output$Resolution)
+
+for(i in 1:10) {
+  
+  for(j in seq_along(cols)) {
+    
+    x   = data.frame(x = factor(obj_cell_50[[]][,cols[j]]))
+    x   = model.matrix(~x, data = x)[,-1]
+    mod = lm(pcs[,i] ~ x)
+    output$rsq[(i - 1) * 10 + j] = summary(mod)$r.squared
+
+  } # for(j)
+  
+} # for(i)
+```
+
+```{r}
+output %>%
+  ggplot(aes(Resolution, rsq)) +
+    geom_line(aes(color = n_PCs, group = n_PCs)) +
+    labs(title = "R^2 versus cluster resolution: 50 PCs",
+         y     = "R^2", 
+         color = "Num PCs") +
+    theme(text = element_text(size = 20))
+```
+
+```{r fig.width=10,fig.height=10}
+layout(matrix(1:64, ncol = 8))
+par(plt = c(0.05, 0.95, 0.05, 0.95))
+for(i in 1:8) {
+  for(j in 1:8) {
+    if(i ==j) {
+      plot(1, 1, col = 'white')
+      text(1, 1, labels = paste0('PC', i), cex = 2)
+    } else{
+      plot(pcs[,i], pcs[,j], pch = 16, col = rgb(0,0,0,0.3))
+    }
+  } # for(j)
+  
+} # for(i)
+```
