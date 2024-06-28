@@ -132,6 +132,20 @@ df %>%
     theme(text = element_text(size = 20))
 ```
 
+```{r}
+p = df %>%
+  filter(!is.nan(sc_prop) & ! is.nan(sn_prop)) %>%
+  pivot_longer(cols = sc_prop:sn_prop) %>%
+  mutate(name = if_else(name == 'sc_prop', 'Single Cell', 'Single Nuclear')) %>%
+  ggplot(aes(value)) +
+    geom_histogram(bins = 100) +
+    facet_wrap(~name, ncol = 1, scales = 'free_y') + 
+    labs(title = 'Intronic Proportions in Each Cell') +
+    theme(text = element_text(size = 20))
+ggsave(filename = '../figures/intron_prop_in_sc_sn.png', plot = p)
+```
+
+
 Get the proportion of intronic reads overall in single cell & single nuclear.
 
 ```{r}
@@ -148,12 +162,32 @@ labs(title = "Genes per Cell", x = "Method", y = "nFeatures_RNA") +
 ```
 
 ```{r}
+p = ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nFeature_RNA),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  guides(fill=F) +
+labs(title = "Genes per Cell", x = "Method", y = "nFeatures_RNA") +
+  theme(text = element_text(size = 20))
+ggsave(filename = '../figures/features.png', plot = p)
+```
+
+
+```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nCount_RNA),aes(x, y, fill=x)) +
   geom_boxplot() +
   guides(fill=F) +
   labs(title = "Counts per Cell", x = "Method", y = "nCount_RNA") +
   theme(text = element_text(size = 20))
 ```
+
+```{r}
+p = ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$nCount_RNA),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  guides(fill=F) +
+  labs(title = "Counts per Cell", x = "Method", y = "nCount_RNA") +
+  theme(text = element_text(size = 20))
+ggsave(filename = '../figures/counts.png', plot = p)
+```
+
 
 ```{r}
 ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$percent.mt),aes(x, y, fill=x)) +
@@ -164,11 +198,32 @@ ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$percent.mt),aes(x, y, fill=x
 ```
 
 ```{r}
+p = ggplot(tibble(x=merged.obj$orig.ident, y=merged.obj$percent.mt),aes(x, y, fill=x)) +
+  geom_boxplot() +
+  guides(fill=F) +
+  labs(title = "Mitochondrial RNA Content", x = "Method", y = "% Mitochondrial RNA") +
+  theme(text = element_text(size = 20))
+ggsave(filename = '../figures/mito_prop.png', plot = p)
+```
+
+
+```{r}
 ggplot(tibble(x = merged.obj$orig.ident, y = merged.obj$percent.ribo), aes(x, y, fill = x)) +
   geom_boxplot() +
   guides(fill = F) +
   labs(title = "Ribosomal RNA Content", x = "Method", y = "% Ribosomal RNA") +
   theme(text = element_text(size = 20))
+```
+
+
+```{r}
+p = tibble(x = merged.obj$orig.ident, y = merged.obj$percent.ribo) %>%
+  ggplot(aes(x, y, fill = x)) +
+  geom_boxplot() +
+  guides(fill = F) +
+  labs(title = "Ribosomal RNA Content", x = "Method", y = "% Ribosomal RNA") +
+  theme(text = element_text(size = 20))
+ggsave(filename = '../figures/ribo_prop.png', plot = p)
 ```
 
 Normalize, scale data, run PCA, and clustering.
