@@ -239,7 +239,7 @@ for(i in 1:10) {
 output %>%
   ggplot(aes(Resolution, rsq)) +
     geom_line(aes(color = n_PCs, group = n_PCs)) +
-    labs(title = "R^2 versus cluster resolution: 10 PCs",
+    labs(title = "R^2 versus cluster resolution: 25 PCs",
          y     = "R^2", 
          color = "Num PCs") +
     theme(text = element_text(size = 20))
@@ -254,7 +254,7 @@ for(i in 1:8) {
       plot(1, 1, col = 'white')
       text(1, 1, labels = paste0('PC', i), cex = 2)
     } else{
-      plot(pcs[,i], pcs[,j], pch = 16, col = rgb(0,0,0,0.3))
+      plot(pcs[,i], pcs[,j], pch = 16, col = as.numeric(obj_cell[[]]$seurat_cluster) + 1)
     }
   } # for(j)
   
